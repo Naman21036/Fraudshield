@@ -4,4 +4,8 @@ matplotlib
 scikit-learn
 seaborn
 setuptools
+xgboost
+lightgbm
+catboost
+imbalanced-learn
 -e .
