@@ -26,7 +26,7 @@ class DataIngestion:
                 df,
                 test_size=0.3,
                 random_state=42,
-                stratify=df["default.payment.next.month"]
+                stratify=df["Class"]
             )
             train_set.to_csv(self.ingestion_config.train_data_path, index=False)
             test_set.to_csv(self.ingestion_config.test_data_path, index=False)
@@ -40,4 +40,3 @@ class DataIngestion:
 if __name__ == "__main__":
     obj = DataIngestion()
     train_data, test_data = obj.initiate_data_ingestion()
-    
