@@ -8,4 +8,8 @@ xgboost
 lightgbm
 catboost
 imbalanced-learn
+fastapi
+uvicorn
+pydantic
+streamlit
 -e .
