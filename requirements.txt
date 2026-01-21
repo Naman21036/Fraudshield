@@ -12,4 +12,4 @@ fastapi
 uvicorn
 pydantic
 streamlit
--e .
+requests
