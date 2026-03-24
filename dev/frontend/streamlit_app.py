@@ -5,7 +5,7 @@ import pandas as pd
 # --------------------------------------------------
 # Config
 # --------------------------------------------------
-API_BASE_URL = "http://127.0.0.1:8000"
+API_BASE_URL = "https://fraudshield-fraud-transaction.onrender.com"
 PREDICT_URL = f"{API_BASE_URL}/predict"
 
 st.set_page_config(
@@ -50,13 +50,13 @@ st.markdown("---")
 with st.sidebar:
     st.subheader("API Status")
     try:
-        health = requests.get(API_BASE_URL, timeout=3)
+        health = requests.get(API_BASE_URL, timeout=5)
         if health.status_code == 200:
             st.success("API is running")
         else:
             st.warning("API reachable but unhealthy")
-    except:
-        st.error("API not reachable")
+    except Exception as e:
+        st.error(f"API error: {str(e)}")
 
     st.markdown("---")
 
@@ -105,22 +105,28 @@ if uploaded_file:
     if st.button("Run Batch Prediction"):
         results = []
 
-        for _, row in df_batch.iterrows():
-            payload = row.to_dict()
-            try:
-                r = requests.post(PREDICT_URL, json=payload, timeout=5)
-                if r.status_code == 200:
-                    res = r.json()
-                    res["risk_band"] = (
-                        "High" if res["fraud_probability"] >= threshold
-                        else "Medium" if res["fraud_probability"] >= threshold * 0.6
-                        else "Low"
-                    )
-                    results.append(res)
-                else:
-                    results.append({"error": "API error"})
-            except:
-                results.append({"error": "Connection failed"})
+        with st.spinner("Running batch predictions..."):
+            for _, row in df_batch.iterrows():
+                payload = row.to_dict()
+                try:
+                    r = requests.post(PREDICT_URL, json=payload, timeout=15)
+
+                    if r.status_code == 200:
+                        res = r.json()
+                        prob = res.get("fraud_probability", 0)
+
+                        res["risk_band"] = (
+                            "High" if prob >= threshold
+                            else "Medium" if prob >= threshold * 0.6
+                            else "Low"
+                        )
+
+                        results.append(res)
+                    else:
+                        results.append({"error": "API error"})
+
+                except Exception as e:
+                    results.append({"error": str(e)})
 
         st.markdown("### Batch Results")
         st.dataframe(pd.DataFrame(results))
@@ -146,22 +152,18 @@ with col2:
     if run_single:
         payload = {
             "Time": Time,
-            "Amount": Amount,
-            **V
+            **V,
+            "Amount": Amount
         }
 
         try:
             with st.spinner("Calling FraudShield API..."):
-                response = requests.post(PREDICT_URL, json=payload, timeout=10)
+                response = requests.post(PREDICT_URL, json=payload, timeout=15)
 
             if response.status_code == 200:
                 result = response.json()
-                prob = result["fraud_probability"]
+                prob = result.get("fraud_probability", 0)
 
-                # Threshold based decision
-                prediction = 1 if prob >= threshold else 0
-
-                # Risk bands
                 if prob >= threshold:
                     st.error("High Risk Fraud")
                     risk = "High"
@@ -175,15 +177,14 @@ with col2:
                 st.metric("Fraud Probability", f"{prob:.4f}")
                 st.progress(min(int(prob * 100), 100))
 
-                # Model confidence explanation
                 st.markdown("### Model Confidence Explanation")
                 st.write(
                     f"""
                     The model estimates a **{prob:.2%} probability** of fraud.
-                    
+
                     Based on the selected threshold (**{threshold:.2f}**),
                     this transaction is classified as **{risk} risk**.
-                    
+
                     Adjusting the threshold allows you to trade off between
                     false positives and false negatives.
                     """
