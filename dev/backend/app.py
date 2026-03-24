@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field,computed_field
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from typing import List, Optional,Literal,Annotated
 import pandas as pd
@@ -9,6 +10,13 @@ import pickle
 import os
 
 app= FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 @app.get("/")
 def read_root():
     return {"message": "Welcome to FraudShield API"}
