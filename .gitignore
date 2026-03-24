@@ -22,7 +22,9 @@ notebooks/*.csv
 
 # Model artifacts
 models/
-artifacts/
+artifacts/*
+!artifacts/best_model.pkl
+!artifacts/scaler.pkl
 *.joblib
 
 # Logs
