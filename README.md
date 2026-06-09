@@ -1,74 +1,140 @@
-Transaction Fraud Detection System
+# FraudShield 🛡️
 
-An end to end machine learning based transaction fraud detection system built using FastAPI.
-The project focuses on real time risk scoring, handling highly imbalanced data, and production ready ML deployment.
+### Real Time Transaction Fraud Detection System
 
-Project Overview
+FraudShield is an end to end machine learning powered fraud detection platform designed to identify suspicious financial transactions in real time.
 
-Financial fraud detection is a highly imbalanced and time sensitive classification problem.
-This system identifies fraudulent transactions by analyzing transaction level features and learned behavioral patterns.
+Built with FastAPI and modern machine learning techniques, the system predicts fraud probability, generates risk scores, and provides fast API responses suitable for production environments.
 
-A trained machine learning model is exposed via FastAPI endpoints to deliver fast, reliable, and explainable fraud predictions suitable for real world deployment.
+### 🌐 Live Demo
 
-Key Features
+**API Endpoint:** https://fraudshield-project.onrender.com/
 
-Real time fraud prediction API
+**GitHub Repository:** https://github.com/Naman21036/FraudShield
 
-Probabilistic risk scoring instead of binary decisions
+---
 
-Handles extreme class imbalance effectively
+## Overview
 
-Robust preprocessing and feature scaling pipeline
+Financial fraud detection is one of the most challenging machine learning applications due to:
 
-Modular ML training and evaluation workflow
+* Extreme class imbalance
+* Rapidly evolving fraud patterns
+* High cost of false negatives
+* Real time decision requirements
 
-Production ready FastAPI backend
+FraudShield addresses these challenges through a complete machine learning pipeline that combines data preprocessing, feature scaling, model training, and API based deployment.
 
-Deployment ready for cloud platforms (Render, Railway, etc.)
+The system predicts the probability of fraud instead of making only binary decisions, enabling risk based transaction monitoring.
 
-Tech Stack
+---
 
-Python
+## Features
 
-Scikit learn
+### Fraud Prediction API
 
-Pandas, NumPy
+* Real time transaction scoring
+* REST API powered by FastAPI
+* Millisecond level prediction latency
 
-FastAPI
+### Machine Learning Pipeline
 
-Uvicorn
+* Automated preprocessing
+* Feature scaling
+* Model serialization
+* Reproducible training workflow
 
-Imbalanced learn
+### Imbalanced Data Handling
 
-XGBoost, LightGBM (model experimentation)
+* SMOTE based oversampling
+* Class weighting techniques
+* Threshold optimization
 
-Dataset
+### Risk Scoring
 
-The model is trained using publicly available credit card transaction datasets with fraud labels.
+* Fraud probability output
+* Confidence based classification
+* Explainable risk assessment
 
-Recommended datasets:
+### Production Ready Deployment
 
-Kaggle Credit Card Fraud Detection Dataset
+* FastAPI backend
+* Docker compatible architecture
+* Cloud deployment support
 
-PaySim Mobile Money Fraud Dataset
+---
 
-Note: Due to privacy concerns, original features are anonymized using PCA based transformations.
+## System Architecture
 
-System Architecture
+```text
+Transaction Input
+        │
+        ▼
+Input Validation
+(FastAPI + Pydantic)
+        │
+        ▼
+Feature Preprocessing
+        │
+        ▼
+Feature Scaling
+        │
+        ▼
+Trained ML Model
+        │
+        ▼
+Fraud Probability
+        │
+        ▼
+Risk Classification
+        │
+        ▼
+JSON Response
+```
 
-Client sends transaction data to the API
+---
 
-FastAPI validates and parses the request
+## Tech Stack
 
-Preprocessing and scaling pipeline transforms the input
+### Backend
 
-Trained ML model predicts fraud probability
+* FastAPI
+* Uvicorn
 
-Risk score and decision are returned in real time
+### Machine Learning
 
-API Endpoint
+* Scikit Learn
+* Imbalanced Learn
+
+### Data Processing
+
+* Pandas
+* NumPy
+
+### Model Experimentation
+
+* Random Forest
+* XGBoost
+* LightGBM
+
+### Deployment
+
+* Render
+* Docker Ready
+
+---
+
+## API Usage
+
+### Endpoint
+
+```http
 POST /predict
-Request Body Example
+```
+
+### Request Example
+
+```json
 {
   "Time": 12345,
   "V1": -1.23,
@@ -101,88 +167,148 @@ Request Body Example
   "V28": 0.01,
   "Amount": 18500
 }
+```
 
-Response Example
+### Response Example
+
+```json
 {
   "fraud_prediction": 1,
   "fraud_label": "Fraud",
   "fraud_probability": 0.91
 }
+```
 
-Project Structure
+---
+
+## Dataset
+
+The project is trained on publicly available financial fraud datasets.
+
+### Recommended Sources
+
+* Kaggle Credit Card Fraud Detection Dataset
+* PaySim Mobile Money Fraud Dataset
+
+To preserve privacy, transaction features are anonymized using PCA transformed variables.
+
+---
+
+## Model Evaluation
+
+Since fraud detection is an imbalanced classification problem, traditional accuracy metrics are insufficient.
+
+Evaluation focuses on:
+
+* Precision
+* Recall
+* F1 Score
+* ROC AUC
+* Precision Recall Tradeoff
+
+### Why Not Accuracy?
+
+A model predicting every transaction as legitimate can achieve over 99% accuracy while completely failing to detect fraud.
+
+For this reason, FraudShield prioritizes Recall and F1 Score.
+
+---
+
+## Project Structure
+
+```text
 FraudShield/
+│
 ├── dev/
 │   └── backend/
 │       ├── app.py
 │       ├── requirements.txt
+│
 ├── artifacts/
 │   ├── best_model.pkl
 │   ├── scaler.pkl
+│
 ├── notebooks/
 │   ├── eda.ipynb
 │   ├── model.ipynb
+│
 ├── src/
 │   ├── preprocessing/
 │   ├── models/
 │   ├── utils/
-├── README.md
+│
+└── README.md
+```
 
-Model Evaluation Strategy
+---
 
-Due to extreme class imbalance, evaluation focuses on:
+## Local Setup
 
-Precision
+### Clone Repository
 
-Recall
-
-F1 Score
-
-ROC AUC
-
-Accuracy is intentionally avoided as it is misleading for fraud detection problems.
-
-How to Run Locally
-1. Clone the repository
+```bash
 git clone https://github.com/Naman21036/FraudShield.git
 cd FraudShield/dev/backend
+```
 
-2. Install dependencies
+### Install Dependencies
+
+```bash
 pip install -r requirements.txt
+```
 
-3. Start FastAPI server
-uvicorn app:app --port 10000
+### Run Server
 
-4. Open API docs
+```bash
+uvicorn app:app --reload --port 10000
+```
+
+### Open Interactive API Documentation
+
+```text
 http://localhost:10000/docs
+```
 
-Deployment
+---
 
-The application is designed for cloud deployment using:
+## Deployment
 
-Render
+FraudShield is designed for deployment on:
 
-Railway
+* Render
+* Railway
+* Fly.io
+* Docker Containers
 
-Fly.io
+Production start command:
 
-Start command for production:
-
+```bash
 uvicorn app:app --host 0.0.0.0 --port $PORT
+```
 
-Future Improvements
+---
 
-Streaming fraud detection using Kafka
+## Future Enhancements
 
-Automated model retraining pipelines
+* Kafka Based Streaming Fraud Detection
+* Model Drift Monitoring
+* Automated Retraining Pipelines
+* Feature Store Integration
+* Explainable AI Dashboard
+* Hybrid Rule Engine + ML Detection
+* Real Time Alerting System
 
-Model drift detection
+---
 
-Hybrid rule based + ML decision engine
+## Contributors
 
-Monitoring and alerting dashboard
+### Naman Gupta
+---
 
-Author
+## License
 
-Naman Gupta
-Machine Learning and Backend Engineering
-Focused on applied ML systems and production deployment
+This project is released under the MIT License.
+
+---
+
+⭐ If you found this project useful, consider starring the repository.
