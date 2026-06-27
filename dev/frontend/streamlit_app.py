@@ -11,6 +11,11 @@ st.set_page_config(
     layout="wide",
 )
 
+if "result" not in st.session_state:
+    st.session_state.result = None
+if "count" not in st.session_state:
+    st.session_state.count = 0
+
 st.markdown("""<style>
 .stApp { background-color: #060e1c; color: #c8d4e8; }
 
@@ -36,7 +41,7 @@ section[data-testid="stSidebar"] {
 .fs-title { font-size: 1.4rem; font-weight: 700; color: #dce8ff; letter-spacing: -0.4px; }
 .fs-sub   { font-size: 0.68rem; color: #2a4268; text-transform: uppercase; letter-spacing: 0.12em; }
 
-/* Section labels */
+/* Labels */
 .fs-label {
     font-size: 0.6rem;
     font-weight: 700;
@@ -47,8 +52,15 @@ section[data-testid="stSidebar"] {
     margin-top: 1rem;
 }
 
-/* Result card */
-.fs-card { border-radius: 8px; padding: 1.6rem 1.8rem; }
+/* Cards */
+.fs-card {
+    border-radius: 8px;
+    padding: 1.8rem 2rem;
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
 .card-idle { background: #091728; border: 1px solid #0e2040; }
 .card-low  { background: #030f07; border: 1px solid #14532d; }
 .card-mid  { background: #0e0900; border: 1px solid #6b3800; }
@@ -59,31 +71,59 @@ section[data-testid="stSidebar"] {
     text-transform: uppercase;
     letter-spacing: 0.14em;
     color: #2a4268;
+    margin-bottom: 0.2rem;
 }
 .fs-prob {
-    font-size: 3.6rem;
+    font-size: 4rem;
     font-weight: 800;
     line-height: 1;
     font-variant-numeric: tabular-nums;
-    margin: 0.2rem 0 0.7rem 0;
+    letter-spacing: -1px;
+    margin-bottom: 0.9rem;
 }
-.p-idle { color: #142235; }
+.p-idle { color: #0f1e30; }
 .p-low  { color: #22c55e; }
 .p-mid  { color: #f59e0b; }
 .p-high { color: #ef4444; }
 
-.fs-verdict { font-size: 1rem; font-weight: 600; }
+.fs-verdict { font-size: 1.05rem; font-weight: 600; line-height: 1.3; }
 .v-idle { color: #1a2d47; }
 .v-low  { color: #16a34a; }
 .v-mid  { color: #b45309; }
 .v-high { color: #dc2626; }
 
-.fs-meta { font-size: 0.68rem; color: #1e3352; margin-top: 0.55rem; }
+.fs-meta {
+    font-size: 0.68rem;
+    color: #1e3352;
+    margin-top: 0.6rem;
+    line-height: 1.6;
+}
+.fs-count {
+    font-size: 0.62rem;
+    color: #1e3352;
+    margin-top: 1.2rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid #0e2040;
+    letter-spacing: 0.04em;
+}
 
-/* Status dot */
+/* Status */
 .fs-status { font-size: 0.75rem; color: #3d5a80; }
 
-/* Streamlit widget overrides */
+/* Fix red tab indicator → blue */
+[data-baseweb="tab-highlight"] {
+    background-color: #2a5ccc !important;
+}
+[data-baseweb="tab"] {
+    color: #2a4268 !important;
+    font-size: 0.83rem !important;
+    font-weight: 500 !important;
+}
+[data-baseweb="tab"][aria-selected="true"] {
+    color: #c8d8f4 !important;
+}
+
+/* Buttons */
 .stButton > button {
     background-color: #0d2b58 !important;
     color: #93b8f0 !important;
@@ -97,18 +137,21 @@ section[data-testid="stSidebar"] {
     background-color: #112f63 !important;
     border-color: #1f50a0 !important;
 }
+
+/* Expander */
 div[data-testid="stExpander"] {
     border: 1px solid #0e2040 !important;
     border-radius: 6px !important;
 }
+
+/* Progress bar track */
 div[data-testid="stProgress"] > div {
     background-color: #091728 !important;
     border-radius: 4px !important;
 }
-button[data-baseweb="tab"] { font-size: 0.82rem; font-weight: 500; }
 </style>""", unsafe_allow_html=True)
 
-# ── Header ──────────────────────────────────────────────────────────────────
+# ── Header ───────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="fs-header">
     <span class="fs-title">🛡 FraudShield</span>
@@ -116,7 +159,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Sidebar ──────────────────────────────────────────────────────────────────
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="fs-label">System</div>', unsafe_allow_html=True)
     try:
@@ -153,8 +196,7 @@ with tab_single:
             V = {}
             ca, cb = st.columns(2)
             for i in range(1, 29):
-                col = ca if i % 2 != 0 else cb
-                with col:
+                with (ca if i % 2 != 0 else cb):
                     V[f"V{i}"] = st.number_input(f"V{i}", value=0.0, step=0.01, key=f"v{i}")
 
         analyze = st.button("Analyze", use_container_width=True)
@@ -181,16 +223,13 @@ with tab_single:
                         card, pc, vc = "card-low", "p-low", "v-low"
                         verdict = "Likely Legitimate"
 
-                    st.markdown(f"""
-                    <div class="fs-card {card}">
-                        <div class="fs-prob-unit">Fraud probability</div>
-                        <div class="fs-prob {pc}">{pct:.1f}%</div>
-                        <div class="fs-verdict {vc}">{verdict}</div>
-                        <div class="fs-meta">threshold {threshold:.0%} · ₹{Amount:,.2f} · {Time:,.0f}s</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    st.progress(min(prob, 1.0))
+                    st.session_state.result = {
+                        "prob": prob, "pct": pct,
+                        "card": card, "pc": pc, "vc": vc,
+                        "verdict": verdict,
+                        "amount": Amount, "time": Time, "threshold": threshold,
+                    }
+                    st.session_state.count += 1
 
                 else:
                     st.error(f"API returned {resp.status_code}")
@@ -200,13 +239,29 @@ with tab_single:
             except Exception as e:
                 st.error(str(e))
 
+        res = st.session_state.result
+        if res:
+            label = "s" if st.session_state.count != 1 else ""
+            st.markdown(f"""
+            <div class="fs-card {res['card']}">
+                <div class="fs-prob-unit">Fraud probability</div>
+                <div class="fs-prob {res['pc']}">{res['pct']:.1f}%</div>
+                <div class="fs-verdict {res['vc']}">{res['verdict']}</div>
+                <div class="fs-meta">
+                    threshold {res['threshold']:.0%}&ensp;·&ensp;₹{res['amount']:,.2f}&ensp;·&ensp;{res['time']:,.0f}s
+                </div>
+                <div class="fs-count">{st.session_state.count} transaction{label} analyzed this session</div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.progress(min(res["prob"], 1.0))
         else:
             st.markdown("""
             <div class="fs-card card-idle">
-                <div class="fs-prob p-idle">—</div>
-                <div class="fs-verdict v-idle">No analysis yet</div>
-                <div class="fs-meta" style="margin-top:0.4rem">
-                    Enter transaction details and click Analyze.
+                <div class="fs-prob-unit">Fraud probability</div>
+                <div class="fs-prob p-idle">—.—%</div>
+                <div class="fs-verdict v-idle">No result yet</div>
+                <div class="fs-meta">
+                    Fill in the transaction fields on the left<br>and click Analyze.
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -237,7 +292,7 @@ with tab_bulk:
                         results.append(res)
                     else:
                         results.append({"fraud_probability": None, "fraud_label": "Error", "risk": "Error"})
-                except Exception as e:
+                except Exception:
                     results.append({"fraud_probability": None, "fraud_label": "Error", "risk": "Error"})
                 bar.progress((i + 1) / n)
 
@@ -254,6 +309,6 @@ with tab_bulk:
             csv_bytes = results_df.to_csv(index=False).encode()
             st.download_button("Download results (.csv)", csv_bytes, "fraudshield_results.csv", "text/csv")
 
-# ── Footer ───────────────────────────────────────────────────────────────────
+# ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("---")
 st.caption("FraudShield · Naman Gupta")
