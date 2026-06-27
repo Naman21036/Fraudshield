@@ -2,209 +2,258 @@ import streamlit as st
 import requests
 import pandas as pd
 
-# --------------------------------------------------
-# Config
-# --------------------------------------------------
 API_BASE_URL = "https://fraudshield-fraud-transaction.onrender.com"
 PREDICT_URL = f"{API_BASE_URL}/predict"
 
 st.set_page_config(
     page_title="FraudShield",
     page_icon="🛡️",
-    layout="wide"
+    layout="wide",
 )
 
-# --------------------------------------------------
-# Dark mode styling
-# --------------------------------------------------
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-color: #0E1117;
-        color: #FAFAFA;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("""<style>
+.stApp { background-color: #060e1c; color: #c8d4e8; }
 
-# --------------------------------------------------
-# Header
-# --------------------------------------------------
-st.markdown(
-    """
-    <h1 style="text-align:center;">FraudShield</h1>
-    <p style="text-align:center; color: #9CA3AF;">
-    Real time fraud detection system
-    </p>
-    """,
-    unsafe_allow_html=True
-)
+section[data-testid="stSidebar"] {
+    background-color: #07142a;
+    border-right: 1px solid #0e2040;
+}
+.block-container {
+    padding-top: 1.4rem;
+    padding-bottom: 2rem;
+    max-width: 1080px;
+}
 
-st.markdown("---")
+/* Header */
+.fs-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 1.2rem;
+    border-bottom: 1px solid #0e2040;
+    margin-bottom: 1.6rem;
+}
+.fs-title { font-size: 1.4rem; font-weight: 700; color: #dce8ff; letter-spacing: -0.4px; }
+.fs-sub   { font-size: 0.68rem; color: #2a4268; text-transform: uppercase; letter-spacing: 0.12em; }
 
-# --------------------------------------------------
-# API Health Indicator
-# --------------------------------------------------
+/* Section labels */
+.fs-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #2a4268;
+    margin-bottom: 0.55rem;
+    margin-top: 1rem;
+}
+
+/* Result card */
+.fs-card { border-radius: 8px; padding: 1.6rem 1.8rem; }
+.card-idle { background: #091728; border: 1px solid #0e2040; }
+.card-low  { background: #030f07; border: 1px solid #14532d; }
+.card-mid  { background: #0e0900; border: 1px solid #6b3800; }
+.card-high { background: #0e0303; border: 1px solid #7f1d1d; }
+
+.fs-prob-unit {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #2a4268;
+}
+.fs-prob {
+    font-size: 3.6rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    margin: 0.2rem 0 0.7rem 0;
+}
+.p-idle { color: #142235; }
+.p-low  { color: #22c55e; }
+.p-mid  { color: #f59e0b; }
+.p-high { color: #ef4444; }
+
+.fs-verdict { font-size: 1rem; font-weight: 600; }
+.v-idle { color: #1a2d47; }
+.v-low  { color: #16a34a; }
+.v-mid  { color: #b45309; }
+.v-high { color: #dc2626; }
+
+.fs-meta { font-size: 0.68rem; color: #1e3352; margin-top: 0.55rem; }
+
+/* Status dot */
+.fs-status { font-size: 0.75rem; color: #3d5a80; }
+
+/* Streamlit widget overrides */
+.stButton > button {
+    background-color: #0d2b58 !important;
+    color: #93b8f0 !important;
+    border: 1px solid #173f7a !important;
+    border-radius: 5px !important;
+    font-weight: 600 !important;
+    font-size: 0.82rem !important;
+    letter-spacing: 0.02em !important;
+}
+.stButton > button:hover {
+    background-color: #112f63 !important;
+    border-color: #1f50a0 !important;
+}
+div[data-testid="stExpander"] {
+    border: 1px solid #0e2040 !important;
+    border-radius: 6px !important;
+}
+div[data-testid="stProgress"] > div {
+    background-color: #091728 !important;
+    border-radius: 4px !important;
+}
+button[data-baseweb="tab"] { font-size: 0.82rem; font-weight: 500; }
+</style>""", unsafe_allow_html=True)
+
+# ── Header ──────────────────────────────────────────────────────────────────
+st.markdown("""
+<div class="fs-header">
+    <span class="fs-title">🛡 FraudShield</span>
+    <span class="fs-sub">Transaction Risk Analysis</span>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.subheader("API Status")
+    st.markdown('<div class="fs-label">System</div>', unsafe_allow_html=True)
     try:
-        health = requests.get(API_BASE_URL, timeout=5)
-        if health.status_code == 200:
-            st.success("API is running")
-        else:
-            st.warning("API reachable but unhealthy")
-    except Exception as e:
-        st.error(f"API error: {str(e)}")
+        health = requests.get(API_BASE_URL, timeout=4)
+        status = "🟢 API online" if health.status_code == 200 else "🟡 API degraded"
+    except Exception:
+        status = "🔴 API unreachable"
+    st.markdown(f'<div class="fs-status">{status}</div>', unsafe_allow_html=True)
 
-    st.markdown("---")
-
-# --------------------------------------------------
-# Threshold slider
-# --------------------------------------------------
-with st.sidebar:
-    st.subheader("Decision Threshold")
+    st.markdown('<div class="fs-label">Fraud Threshold</div>', unsafe_allow_html=True)
     threshold = st.slider(
-        "Fraud Probability Threshold",
-        min_value=0.1,
-        max_value=0.9,
-        value=0.5,
-        step=0.05
+        "threshold",
+        min_value=0.10,
+        max_value=0.90,
+        value=0.50,
+        step=0.05,
+        label_visibility="collapsed",
     )
+    st.caption(f"Transactions above **{threshold:.0%}** probability are flagged as fraud.")
 
-# --------------------------------------------------
-# Sidebar Inputs
-# --------------------------------------------------
-with st.sidebar:
-    st.subheader("Transaction Inputs")
+# ── Tabs ─────────────────────────────────────────────────────────────────────
+tab_single, tab_bulk = st.tabs(["Analyze Transaction", "Bulk Upload"])
 
-    Time = st.number_input("Time (seconds)", min_value=0.01, value=10000.0)
-    Amount = st.number_input("Amount", min_value=0.01, value=100.0)
+with tab_single:
+    left, right = st.columns([1, 1.2], gap="large")
 
-    st.markdown("### PCA Features")
-    V = {}
-    for i in range(1, 29):
-        V[f"V{i}"] = st.number_input(f"V{i}", value=0.0, step=0.01)
+    with left:
+        st.markdown('<div class="fs-label">Transaction</div>', unsafe_allow_html=True)
+        Time = st.number_input("Time elapsed (seconds)", min_value=0.01, value=10000.0)
+        Amount = st.number_input("Amount (₹)", min_value=0.01, value=100.0)
 
-    run_single = st.button("Run Single Prediction")
+        with st.expander("PCA Components — V1 to V28"):
+            st.caption("Anonymized features from PCA dimensionality reduction.")
+            V = {}
+            ca, cb = st.columns(2)
+            for i in range(1, 29):
+                col = ca if i % 2 != 0 else cb
+                with col:
+                    V[f"V{i}"] = st.number_input(f"V{i}", value=0.0, step=0.01, key=f"v{i}")
 
-# --------------------------------------------------
-# Batch CSV Upload
-# --------------------------------------------------
-st.markdown("## Batch Prediction")
-uploaded_file = st.file_uploader(
-    "Upload CSV file (same schema as API input)",
-    type=["csv"]
-)
+        analyze = st.button("Analyze", use_container_width=True)
 
-if uploaded_file:
-    df_batch = pd.read_csv(uploaded_file)
-    st.dataframe(df_batch.head())
+    with right:
+        if analyze:
+            payload = {"Time": Time, **V, "Amount": Amount}
+            try:
+                with st.spinner(""):
+                    resp = requests.post(PREDICT_URL, json=payload, timeout=15)
 
-    if st.button("Run Batch Prediction"):
-        results = []
+                if resp.status_code == 200:
+                    data = resp.json()
+                    prob = data.get("fraud_probability", 0)
+                    pct = prob * 100
 
-        with st.spinner("Running batch predictions..."):
-            for _, row in df_batch.iterrows():
-                payload = row.to_dict()
+                    if prob >= threshold:
+                        card, pc, vc = "card-high", "p-high", "v-high"
+                        verdict = "Likely Fraudulent"
+                    elif prob >= threshold * 0.6:
+                        card, pc, vc = "card-mid", "p-mid", "v-mid"
+                        verdict = "Moderate Risk"
+                    else:
+                        card, pc, vc = "card-low", "p-low", "v-low"
+                        verdict = "Likely Legitimate"
+
+                    st.markdown(f"""
+                    <div class="fs-card {card}">
+                        <div class="fs-prob-unit">Fraud probability</div>
+                        <div class="fs-prob {pc}">{pct:.1f}%</div>
+                        <div class="fs-verdict {vc}">{verdict}</div>
+                        <div class="fs-meta">threshold {threshold:.0%} · ₹{Amount:,.2f} · {Time:,.0f}s</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    st.progress(min(prob, 1.0))
+
+                else:
+                    st.error(f"API returned {resp.status_code}")
+
+            except requests.exceptions.ConnectionError:
+                st.error("Cannot reach the API.")
+            except Exception as e:
+                st.error(str(e))
+
+        else:
+            st.markdown("""
+            <div class="fs-card card-idle">
+                <div class="fs-prob p-idle">—</div>
+                <div class="fs-verdict v-idle">No analysis yet</div>
+                <div class="fs-meta" style="margin-top:0.4rem">
+                    Enter transaction details and click Analyze.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+with tab_bulk:
+    uploaded = st.file_uploader("Upload CSV — must match the API input schema", type=["csv"])
+
+    if uploaded:
+        df = pd.read_csv(uploaded)
+        st.dataframe(df.head(5), use_container_width=True)
+
+        if st.button("Run Bulk Analysis"):
+            results = []
+            bar = st.progress(0)
+            n = len(df)
+
+            for i, (_, row) in enumerate(df.iterrows()):
                 try:
-                    r = requests.post(PREDICT_URL, json=payload, timeout=15)
-
+                    r = requests.post(PREDICT_URL, json=row.to_dict(), timeout=15)
                     if r.status_code == 200:
                         res = r.json()
-                        prob = res.get("fraud_probability", 0)
-
-                        res["risk_band"] = (
-                            "High" if prob >= threshold
-                            else "Medium" if prob >= threshold * 0.6
+                        p = res.get("fraud_probability", 0)
+                        res["risk"] = (
+                            "High" if p >= threshold
+                            else "Moderate" if p >= threshold * 0.6
                             else "Low"
                         )
-
                         results.append(res)
                     else:
-                        results.append({"error": "API error"})
-
+                        results.append({"fraud_probability": None, "fraud_label": "Error", "risk": "Error"})
                 except Exception as e:
-                    results.append({"error": str(e)})
+                    results.append({"fraud_probability": None, "fraud_label": "Error", "risk": "Error"})
+                bar.progress((i + 1) / n)
 
-        st.markdown("### Batch Results")
-        st.dataframe(pd.DataFrame(results))
+            results_df = pd.DataFrame(results)
 
+            if "risk" in results_df.columns:
+                c1, c2, c3 = st.columns(3)
+                c1.metric("High Risk", len(results_df[results_df.risk == "High"]))
+                c2.metric("Moderate", len(results_df[results_df.risk == "Moderate"]))
+                c3.metric("Low Risk", len(results_df[results_df.risk == "Low"]))
+
+            st.dataframe(results_df, use_container_width=True)
+
+            csv_bytes = results_df.to_csv(index=False).encode()
+            st.download_button("Download results (.csv)", csv_bytes, "fraudshield_results.csv", "text/csv")
+
+# ── Footer ───────────────────────────────────────────────────────────────────
 st.markdown("---")
-
-# --------------------------------------------------
-# Main Prediction Panel
-# --------------------------------------------------
-col1, col2 = st.columns([1.5, 1])
-
-with col1:
-    st.subheader("Transaction Summary")
-    st.write(f"Time: {Time}")
-    st.write(f"Amount: ₹{Amount:.2f}")
-
-    st.markdown("PCA Snapshot")
-    st.dataframe({k: [v] for k, v in V.items()}, use_container_width=True)
-
-with col2:
-    st.subheader("Prediction Result")
-
-    if run_single:
-        payload = {
-            "Time": Time,
-            **V,
-            "Amount": Amount
-        }
-
-        try:
-            with st.spinner("Calling FraudShield API..."):
-                response = requests.post(PREDICT_URL, json=payload, timeout=15)
-
-            if response.status_code == 200:
-                result = response.json()
-                prob = result.get("fraud_probability", 0)
-
-                if prob >= threshold:
-                    st.error("High Risk Fraud")
-                    risk = "High"
-                elif prob >= threshold * 0.6:
-                    st.warning("Medium Risk Transaction")
-                    risk = "Medium"
-                else:
-                    st.success("Low Risk Transaction")
-                    risk = "Low"
-
-                st.metric("Fraud Probability", f"{prob:.4f}")
-                st.progress(min(int(prob * 100), 100))
-
-                st.markdown("### Model Confidence Explanation")
-                st.write(
-                    f"""
-                    The model estimates a **{prob:.2%} probability** of fraud.
-
-                    Based on the selected threshold (**{threshold:.2f}**),
-                    this transaction is classified as **{risk} risk**.
-
-                    Adjusting the threshold allows you to trade off between
-                    false positives and false negatives.
-                    """
-                )
-
-            else:
-                st.error("API error")
-                st.json(response.json())
-
-        except requests.exceptions.ConnectionError:
-            st.error("Cannot connect to FastAPI server")
-        except Exception as e:
-            st.error(str(e))
-
-    else:
-        st.info("Enter details and click **Run Single Prediction**")
-
-# --------------------------------------------------
-# Footer
-# --------------------------------------------------
-st.markdown("---")
-st.caption("FraudShield • End to end ML system with API and UI")
-st.caption("Developed by Naman Gupta")
+st.caption("FraudShield · Naman Gupta")
