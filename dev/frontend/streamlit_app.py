@@ -16,6 +16,14 @@ if "result" not in st.session_state:
 if "count" not in st.session_state:
     st.session_state.count = 0
 
+@st.cache_data(ttl=60)
+def check_api_health():
+    try:
+        r = requests.get(API_BASE_URL, timeout=5)
+        return "🟢 API online" if r.status_code == 200 else "🟡 API degraded"
+    except Exception:
+        return "🔴 API unreachable"
+
 st.markdown("""<style>
 .stApp { background-color: #060e1c; color: #c8d4e8; }
 
@@ -162,12 +170,7 @@ st.markdown("""
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="fs-label">System</div>', unsafe_allow_html=True)
-    try:
-        health = requests.get(API_BASE_URL, timeout=4)
-        status = "🟢 API online" if health.status_code == 200 else "🟡 API degraded"
-    except Exception:
-        status = "🔴 API unreachable"
-    st.markdown(f'<div class="fs-status">{status}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="fs-status">{check_api_health()}</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="fs-label">Fraud Threshold</div>', unsafe_allow_html=True)
     threshold = st.slider(
@@ -231,6 +234,8 @@ with tab_single:
                     }
                     st.session_state.count += 1
 
+                elif resp.status_code == 429:
+                    st.warning("The API is rate-limited — wait a few seconds and try again.")
                 else:
                     st.error(f"API returned {resp.status_code}")
 
