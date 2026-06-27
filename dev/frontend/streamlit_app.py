@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import requests
 import pandas as pd
@@ -205,6 +206,8 @@ with tab_single:
         analyze = st.button("Analyze", use_container_width=True)
 
     with right:
+        run_error = None
+
         if analyze:
             payload = {"Time": Time, **V, "Amount": Amount}
             try:
@@ -235,41 +238,52 @@ with tab_single:
                     st.session_state.count += 1
 
                 elif resp.status_code == 429:
-                    st.warning("The API is rate-limited — wait a few seconds and try again.")
+                    run_error = ("Rate limit reached", "Wait a few seconds and try again.")
                 else:
-                    st.error(f"API returned {resp.status_code}")
+                    run_error = (f"API error {resp.status_code}", "The server returned an unexpected response.")
 
             except requests.exceptions.ConnectionError:
-                st.error("Cannot reach the API.")
+                run_error = ("Cannot reach the API", "Check that the backend is running.")
             except Exception as e:
-                st.error(str(e))
+                run_error = ("Something went wrong", str(e))
 
-        res = st.session_state.result
-        if res:
-            label = "s" if st.session_state.count != 1 else ""
+        if run_error:
+            title, detail = run_error
             st.markdown(f"""
-            <div class="fs-card {res['card']}">
-                <div class="fs-prob-unit">Fraud probability</div>
-                <div class="fs-prob {res['pc']}">{res['pct']:.1f}%</div>
-                <div class="fs-verdict {res['vc']}">{res['verdict']}</div>
-                <div class="fs-meta">
-                    threshold {res['threshold']:.0%}&ensp;·&ensp;₹{res['amount']:,.2f}&ensp;·&ensp;{res['time']:,.0f}s
-                </div>
-                <div class="fs-count">{st.session_state.count} transaction{label} analyzed this session</div>
+            <div class="fs-card card-idle" style="border-color:#3d1515;">
+                <div class="fs-prob-unit">Error</div>
+                <div class="fs-prob p-idle" style="font-size:2.2rem;color:#3d2020;margin-bottom:0.6rem;">✕</div>
+                <div class="fs-verdict" style="color:#b91c1c;">{title}</div>
+                <div class="fs-meta" style="color:#4a2020;">{detail}</div>
             </div>
             """, unsafe_allow_html=True)
-            st.progress(min(res["prob"], 1.0))
         else:
-            st.markdown("""
-            <div class="fs-card card-idle">
-                <div class="fs-prob-unit">Fraud probability</div>
-                <div class="fs-prob p-idle">—.—%</div>
-                <div class="fs-verdict v-idle">No result yet</div>
-                <div class="fs-meta">
-                    Fill in the transaction fields on the left<br>and click Analyze.
+            res = st.session_state.result
+            if res:
+                label = "s" if st.session_state.count != 1 else ""
+                st.markdown(f"""
+                <div class="fs-card {res['card']}">
+                    <div class="fs-prob-unit">Fraud probability</div>
+                    <div class="fs-prob {res['pc']}">{res['pct']:.1f}%</div>
+                    <div class="fs-verdict {res['vc']}">{res['verdict']}</div>
+                    <div class="fs-meta">
+                        threshold {res['threshold']:.0%}&ensp;·&ensp;₹{res['amount']:,.2f}&ensp;·&ensp;{res['time']:,.0f}s
+                    </div>
+                    <div class="fs-count">{st.session_state.count} transaction{label} analyzed this session</div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+                st.progress(min(res["prob"], 1.0))
+            else:
+                st.markdown("""
+                <div class="fs-card card-idle">
+                    <div class="fs-prob-unit">Fraud probability</div>
+                    <div class="fs-prob p-idle">—.—%</div>
+                    <div class="fs-verdict v-idle">No result yet</div>
+                    <div class="fs-meta">
+                        Fill in the transaction fields on the left<br>and click Analyze.
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
 with tab_bulk:
     uploaded = st.file_uploader("Upload CSV — must match the API input schema", type=["csv"])
@@ -300,6 +314,7 @@ with tab_bulk:
                 except Exception:
                     results.append({"fraud_probability": None, "fraud_label": "Error", "risk": "Error"})
                 bar.progress((i + 1) / n)
+                time.sleep(0.15)
 
             results_df = pd.DataFrame(results)
 
