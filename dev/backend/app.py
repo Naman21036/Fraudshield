@@ -1,125 +1,134 @@
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field,computed_field
-import uvicorn
-from typing import List, Optional,Literal,Annotated
-import pandas as pd
-import numpy as np
+import logging
 import pickle
-import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Annotated
 
-app= FastAPI()
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to FraudShield API"}
+import pandas as pd
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
+logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
+logger = logging.getLogger(__name__)
 
-MODEL_PATH = os.path.join(PROJECT_ROOT, "artifacts", "best_model.pkl")
-SCALER_PATH = os.path.join(PROJECT_ROOT, "artifacts", "scaler.pkl")
+ARTIFACTS = Path(__file__).resolve().parents[2] / "artifacts"
+FEATURE_COLS = ["Time"] + [f"V{i}" for i in range(1, 29)] + ["Amount"]
 
-with open(MODEL_PATH, "rb") as f:
-    model = pickle.load(f)
-
-with open(SCALER_PATH, "rb") as f:
-    scaler = pickle.load(f)
-
-class TransactionData(BaseModel):
-    Time: float = Annotated[float,Field(..., description="Number of seconds elapsed between this transaction and the first transaction in the dataset",gt=0)]
-    V1: float = Annotated[float,Field(..., description="V1 feature(result of a PCA Dimensionality reduction to protect user identities and sensitive features)")]
-    V2: float = Annotated[float,Field(..., description="V2 feature")]
-    V3: float = Annotated[float,Field(..., description="V3 feature")]
-    V4: float = Annotated[float,Field(..., description="V4 feature")]
-    V5: float = Annotated[float,Field(..., description="V5 feature")]
-    V6: float = Annotated[float,Field(..., description="V6 feature")]
-    V7: float = Annotated[float,Field(..., description="V7 feature")]
-    V8: float = Annotated[float,Field(..., description="V8 feature")]
-    V9: float = Annotated[float,Field(..., description="V9 feature")]
-    V10: float = Annotated[float,Field(..., description="V10 feature")]
-    V11: float = Annotated[float,Field(..., description="V11 feature")]
-    V12: float = Annotated[float,Field(..., description="V12 feature")]
-    V13: float = Annotated[float,Field(..., description="V13 feature")]
-    V14: float = Annotated[float,Field(..., description="V14 feature")]
-    V15: float = Annotated[float,Field(..., description="V15 feature")]
-    V16: float = Annotated[float,Field(..., description="V16 feature")]
-    V17: float = Annotated[float,Field(..., description="V17 feature")]
-    V18: float = Annotated[float,Field(..., description="V18 feature")]
-    V19: float = Annotated[float,Field(..., description="V19 feature")]
-    V20: float = Annotated[float,Field(..., description="V20 feature")]
-    V21: float = Annotated[float,Field(..., description="V21 feature")]
-    V22: float = Annotated[float,Field(..., description="V22 feature")]
-    V23: float = Annotated[float,Field(..., description="V23 feature")]
-    V24: float = Annotated[float,Field(..., description="V24 feature")]
-    V25: float = Annotated[float,Field(..., description="V25 feature")]
-    V26: float = Annotated[float,Field(..., description="V26 feature")]
-    V27: float = Annotated[float,Field(..., description="V27 feature")]
-    V28: float = Annotated[float,Field(..., description="V28 feature")]
-    Amount: float = Annotated[float,Field(..., description="Amount of the transaction",gt=0)]
+_model = None
+_scaler = None
 
 
-@app.post('/predict')
-def predict_fraud(data: TransactionData):
-    
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    global _model, _scaler
     try:
-        input_df= pd.DataFrame([{
-            'Time': data.Time,
-            'V1': data.V1,
-            'V2': data.V2,
-            'V3': data.V3,
-            'V4': data.V4,
-            'V5': data.V5,
-            'V6': data.V6,
-            'V7': data.V7,
-            'V8': data.V8,
-            'V9': data.V9,
-            'V10': data.V10,
-            'V11': data.V11,
-            'V12': data.V12,
-            'V13': data.V13,
-            'V14': data.V14,
-            'V15': data.V15,
-            'V16': data.V16,
-            'V17': data.V17,
-            'V18': data.V18,
-            'V19': data.V19,
-            'V20': data.V20,
-            'V21': data.V21,
-            'V22': data.V22,
-            'V23': data.V23,
-            'V24': data.V24,
-            'V25': data.V25,
-            'V26': data.V26,
-            'V27': data.V27,
-            'V28': data.V28,
-            'Amount': data.Amount
-        }])
-        input_arr = scaler.transform(input_df)
-        prediction = int(model.predict(input_arr)[0])
+        logger.info("Loading artifacts from %s", ARTIFACTS)
+        with open(ARTIFACTS / "best_model.pkl", "rb") as f:
+            _model = pickle.load(f)
+        with open(ARTIFACTS / "scaler.pkl", "rb") as f:
+            _scaler = pickle.load(f)
+        logger.info("Loaded model: %s", type(_model).__name__)
+    except FileNotFoundError as exc:
+        logger.critical("Artifact file not found: %s", exc)
+        raise
+    except Exception as exc:
+        logger.critical("Failed to load artifacts: %s", exc)
+        raise
+    yield
+    _model = _scaler = None
+
+
+app = FastAPI(
+    title="FraudShield",
+    description="Real-time credit card fraud detection.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class TransactionInput(BaseModel):
+    Time: Annotated[float, Field(gt=0, description="Seconds elapsed since first transaction in dataset")]
+    V1: float
+    V2: float
+    V3: float
+    V4: float
+    V5: float
+    V6: float
+    V7: float
+    V8: float
+    V9: float
+    V10: float
+    V11: float
+    V12: float
+    V13: float
+    V14: float
+    V15: float
+    V16: float
+    V17: float
+    V18: float
+    V19: float
+    V20: float
+    V21: float
+    V22: float
+    V23: float
+    V24: float
+    V25: float
+    V26: float
+    V27: float
+    V28: float
+    Amount: Annotated[float, Field(gt=0, description="Transaction amount")]
+
+
+class PredictionResponse(BaseModel):
+    fraud_prediction: int
+    fraud_label: str
+    fraud_probability: float | None
+
+
+class HealthResponse(BaseModel):
+    status: str
+    model_loaded: bool
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    return {"name": "FraudShield API", "docs": "/docs", "health": "/health"}
+
+
+@app.get("/health", response_model=HealthResponse, tags=["meta"])
+def health():
+    return HealthResponse(status="ok", model_loaded=_model is not None)
+
+
+@app.post("/predict", response_model=PredictionResponse, tags=["inference"])
+def predict(data: TransactionInput):
+    if _model is None or _scaler is None:
+        raise HTTPException(status_code=503, detail="Model not loaded.")
+
+    df = pd.DataFrame([data.model_dump()])[FEATURE_COLS]
+
+    try:
+        scaled = _scaler.transform(df)
+        prediction = int(_model.predict(scaled)[0])
         probability = (
-            float(model.predict_proba(input_arr)[0][1])
-            if hasattr(model, "predict_proba")
+            float(_model.predict_proba(scaled)[0][1])
+            if hasattr(_model, "predict_proba")
             else None
         )
+    except Exception as exc:
+        logger.exception("Inference failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-        response = {
-            "fraud_prediction": prediction,
-            "fraud_label": "Fraud" if prediction == 1 else "Legitimate",
-            "fraud_probability": probability
-        }
-
-        return JSONResponse(
-            status_code=200,
-            content=response
-        )
-    
-
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "Prediction failed",
-                "detail": str(e)
-            }
-        )
-    
+    return PredictionResponse(
+        fraud_prediction=prediction,
+        fraud_label="Fraud" if prediction == 1 else "Legitimate",
+        fraud_probability=probability,
+    )
