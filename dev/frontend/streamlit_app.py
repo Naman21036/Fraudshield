@@ -17,7 +17,7 @@ if "result" not in st.session_state:
 if "count" not in st.session_state:
     st.session_state.count = 0
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=300)
 def check_api_health():
     try:
         r = requests.get(f"{API_BASE_URL}/health", timeout=5)
@@ -210,8 +210,11 @@ with tab_single:
         if analyze:
             payload = {"Time": Time, **V, "Amount": Amount}
             try:
-                with st.spinner(""):
-                    resp = requests.post(PREDICT_URL, json=payload, timeout=15)
+                with st.spinner("Analyzing..."):
+                    resp = requests.post(PREDICT_URL, json=payload, timeout=20)
+                    if resp.status_code == 429:
+                        time.sleep(4)
+                        resp = requests.post(PREDICT_URL, json=payload, timeout=20)
 
                 if resp.status_code == 200:
                     data = resp.json()
@@ -236,15 +239,15 @@ with tab_single:
                     }
                     st.session_state.count += 1
 
-                elif resp.status_code == 429:
-                    run_error = ("Rate limit reached", "Wait a few seconds and try again.")
                 elif resp.status_code == 503:
-                    run_error = ("Model not ready", "The server is still loading. Try again in a moment.")
+                    run_error = ("Service starting up", "The server is warming up. Try again in a moment.")
                 else:
                     run_error = (f"API error {resp.status_code}", "The server returned an unexpected response.")
 
             except requests.exceptions.ConnectionError:
                 run_error = ("Cannot reach the API", "Check that the backend is running.")
+            except requests.exceptions.Timeout:
+                run_error = ("Request timed out", "The server took too long to respond. Try again.")
             except Exception as e:
                 run_error = ("Something went wrong", str(e))
 
