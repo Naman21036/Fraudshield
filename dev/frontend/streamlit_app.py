@@ -20,8 +20,10 @@ if "count" not in st.session_state:
 @st.cache_data(ttl=60)
 def check_api_health():
     try:
-        r = requests.get(API_BASE_URL, timeout=5)
-        return "🟢 API online" if r.status_code == 200 else "🟡 API degraded"
+        r = requests.get(f"{API_BASE_URL}/health", timeout=5)
+        if r.status_code == 200 and r.json().get("model_loaded"):
+            return "🟢 API online"
+        return "🟡 API degraded"
     except Exception:
         return "🔴 API unreachable"
 
@@ -160,7 +162,6 @@ div[data-testid="stProgress"] > div {
 }
 </style>""", unsafe_allow_html=True)
 
-# ── Header ───────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="fs-header">
     <span class="fs-title">🛡 FraudShield</span>
@@ -168,7 +169,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="fs-label">System</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="fs-status">{check_api_health()}</div>', unsafe_allow_html=True)
@@ -184,7 +184,6 @@ with st.sidebar:
     )
     st.caption(f"Transactions above **{threshold:.0%}** probability are flagged as fraud.")
 
-# ── Tabs ─────────────────────────────────────────────────────────────────────
 tab_single, tab_bulk = st.tabs(["Analyze Transaction", "Bulk Upload"])
 
 with tab_single:
@@ -239,6 +238,8 @@ with tab_single:
 
                 elif resp.status_code == 429:
                     run_error = ("Rate limit reached", "Wait a few seconds and try again.")
+                elif resp.status_code == 503:
+                    run_error = ("Model not ready", "The server is still loading. Try again in a moment.")
                 else:
                     run_error = (f"API error {resp.status_code}", "The server returned an unexpected response.")
 
@@ -329,6 +330,5 @@ with tab_bulk:
             csv_bytes = results_df.to_csv(index=False).encode()
             st.download_button("Download results (.csv)", csv_bytes, "fraudshield_results.csv", "text/csv")
 
-# ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("---")
 st.caption("FraudShield · Naman Gupta")
